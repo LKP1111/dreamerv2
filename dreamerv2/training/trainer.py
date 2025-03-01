@@ -38,7 +38,7 @@ class Trainer(object):
         self._optim_initialize(config)
 
     def collect_seed_episodes(self, env):
-        s, done  = env.reset(), False 
+        s, done  = env.reset(), False
         for i in range(self.seed_steps):
             a = env.action_space.sample()
             ns, r, done, _ = env.step(a)
@@ -175,6 +175,7 @@ class Trainer(object):
         obs_loss = self._obs_loss(obs_dist, obs[:-1])
         reward_loss = self._reward_loss(reward_dist, rewards[1:])
         pcont_loss = self._pcont_loss(pcont_dist, nonterms[1:])
+        """prior_dist: Independent(OneHotCategoricalStraightThrough(), 1)"""
         prior_dist, post_dist, div = self._kl_loss(prior, posterior)
 
         model_loss = self.loss_scale['kl'] * div + reward_loss + obs_loss + self.loss_scale['discount']*pcont_loss
@@ -294,6 +295,7 @@ class Trainer(object):
         self.RewardDecoder = DenseModel((1,), modelstate_size, config.reward).to(self.device)
         self.ValueModel = DenseModel((1,), modelstate_size, config.critic).to(self.device)
         self.TargetValueModel = DenseModel((1,), modelstate_size, config.critic).to(self.device)
+        # TODO add to xuance
         self.TargetValueModel.load_state_dict(self.ValueModel.state_dict())
         
         if config.discount['use']:
@@ -309,6 +311,7 @@ class Trainer(object):
         model_lr = config.lr['model']
         actor_lr = config.lr['actor']
         value_lr = config.lr['critic']
+        # TODO add to xuance
         self.world_list = [self.ObsEncoder, self.RSSM, self.RewardDecoder, self.ObsDecoder, self.DiscountModel]
         self.actor_list = [self.ActionModel]
         self.value_list = [self.ValueModel]

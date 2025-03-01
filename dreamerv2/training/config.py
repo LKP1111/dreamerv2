@@ -19,7 +19,8 @@ class CartPoleConfig():
     """added end"""
 
     # buffer desc
-    capacity: int = int(1e6)
+    # capacity: int = int(1e6)
+    capacity: int = int(1e3)
     obs_dtype: np.dtype = np.uint8
     action_dtype: np.dtype = np.float32
 
@@ -38,10 +39,10 @@ class CartPoleConfig():
 
     # latent space desc
     rssm_type: str = 'discrete'
-    embedding_size: int = 200
-    rssm_node_size: int = 200
+    embedding_size: int = 32
+    rssm_node_size: int = 32
     rssm_info: Dict = field(
-        default_factory=lambda: {'deter_size': 200, 'stoch_size': 20, 'class_size': 20, 'category_size': 20,
+        default_factory=lambda: {'deter_size': 32, 'stoch_size': 4, 'class_size': 4, 'category_size': 4,
                                  'min_std': 0.1})
 
     # objective desc
@@ -49,7 +50,8 @@ class CartPoleConfig():
     discount_: float = 0.99
     lambda_: float = 0.95
     horizon: int = 10
-    lr: Dict = field(default_factory=lambda: {'model': 2e-4, 'actor': 4e-5, 'critic': 1e-4})
+    """model > critic > actor"""
+    lr: Dict = field(default_factory=lambda: {'model': 8e-3, 'actor': 1e-3, 'critic': 4e-3})
     loss_scale: Dict = field(default_factory=lambda: {'kl': 0.1, 'reward': 1.0, 'discount': 5.0})
     kl: Dict = field(default_factory=lambda: {'use_kl_balance': True, 'kl_balance_scale': 0.8, 'use_free_nats': False,
                                               'free_nats': 0.0})
@@ -59,10 +61,10 @@ class CartPoleConfig():
 
     # actor critic
     actor: Dict = field(
-        default_factory=lambda: {'layers': 3, 'node_size': 100, 'dist': 'one_hot', 'min_std': 1e-4, 'init_std': 5,
+        default_factory=lambda: {'layers': 1, 'node_size': 128, 'dist': 'one_hot', 'min_std': 1e-4, 'init_std': 5,
                                  'mean_scale': 5, 'activation': nn.ELU})
     critic: Dict = field(
-        default_factory=lambda: {'layers': 3, 'node_size': 100, 'dist': 'normal', 'activation': nn.ELU})
+        default_factory=lambda: {'layers': 1, 'node_size': 128, 'dist': 'normal', 'activation': nn.ELU})
     expl: Dict = field(
         default_factory=lambda: {'train_noise': 0.4, 'eval_noise': 0.0, 'expl_min': 0.05, 'expl_decay': 7000.0,
                                  'expl_type': 'epsilon_greedy'})
@@ -71,16 +73,17 @@ class CartPoleConfig():
     actor_entropy_scale: float = 1e-3
 
     # learnt world-models desc
+    """hidden_size count = layers + 1"""
     obs_encoder: Dict = field(
-        default_factory=lambda: {'layers': 3, 'node_size': 100, 'dist': None, 'activation': nn.ELU, 'kernel': 3,
+        default_factory=lambda: {'layers': 1, 'node_size': 64, 'dist': None, 'activation': nn.ELU, 'kernel': 3,
                                  'depth': 16})
     obs_decoder: Dict = field(
-        default_factory=lambda: {'layers': 3, 'node_size': 100, 'dist': 'normal', 'activation': nn.ELU, 'kernel': 3,
+        default_factory=lambda: {'layers': 1, 'node_size': 64, 'dist': 'normal', 'activation': nn.ELU, 'kernel': 3,
                                  'depth': 16})
     reward: Dict = field(
-        default_factory=lambda: {'layers': 3, 'node_size': 100, 'dist': 'normal', 'activation': nn.ELU})
+        default_factory=lambda: {'layers': 1, 'node_size': 64, 'dist': 'normal', 'activation': nn.ELU})
     discount: Dict = field(
-        default_factory=lambda: {'layers': 3, 'node_size': 100, 'dist': 'binary', 'activation': nn.ELU, 'use': True})
+        default_factory=lambda: {'layers': 1, 'node_size': 64, 'dist': 'binary', 'activation': nn.ELU, 'use': True})
 
 # Following HPs are not a result of detailed tuning.   
 

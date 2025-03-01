@@ -134,3 +134,6 @@ dmypy.json
 .__pycache__
 .dreamerv2.egg-info
 .vscode
+
+results
+.idea
