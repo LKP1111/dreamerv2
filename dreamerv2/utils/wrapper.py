@@ -39,6 +39,30 @@ class GymMinAtar(gym.Env):
             self.env.close_display()
         return 0
 
+
+class MyCartPoleWrapper(gym.Wrapper):
+    def __init__(self):
+        # env = gym.make('CartPole-v1', render_mode="human")
+        env = gym.make('CartPole-v1', render_mode="rgb_array")
+        super(MyCartPoleWrapper, self).__init__(env)
+        self.env = env
+        self.n_step = 0
+
+    def reset(self, seed=None):
+        self.n_step = 0
+        state, _ = self.env.reset(seed=seed)
+        self.env.action_space.seed(seed=seed)
+        return state
+
+    def step(self, action) -> object:
+        state, reward, terminated, truncated, info = self.env.step(action)
+        self.n_step += 1
+        done = terminated or truncated
+        return state, reward, done, info
+
+
+
+"""下面只是针对特定 minatar 环境的 obs_wrapper, 对观测进行处理, 让环境变成 POMDP"""
 class breakoutPOMDP(gym.ObservationWrapper):
     def __init__(self, env):
         '''index 2 (trail) is removed, which gives ball's direction'''
@@ -136,8 +160,8 @@ class OneHotAction(gym.Wrapper):
         reference[index] = 1
         return self.env.step(index)
 
-    def reset(self):
-        return self.env.reset()
+    def reset(self, seed):
+        return self.env.reset(seed=seed)
     
     def _sample_action(self):
         actions = self.env.action_space.shape[0]

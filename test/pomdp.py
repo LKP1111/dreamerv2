@@ -3,9 +3,10 @@ import argparse
 import os
 import torch
 import numpy as np
+"""0.18.0 change to 0.26.2; done = terminated or truncated"""
 import gym
-from dreamerv2.utils.wrapper import GymMinAtar, OneHotAction, breakoutPOMDP, space_invadersPOMDP, seaquestPOMDP, asterixPOMDP, freewayPOMDP
-from dreamerv2.training.config import MinAtarConfig
+from dreamerv2.utils.wrapper import GymMinAtar, OneHotAction, breakoutPOMDP, space_invadersPOMDP, seaquestPOMDP, asterixPOMDP, freewayPOMDP, MyCartPoleWrapper
+from dreamerv2.training.config import MinAtarConfig, CartPoleConfig
 from dreamerv2.training.trainer import Trainer
 from dreamerv2.training.evaluator import Evaluator
 
@@ -38,6 +39,12 @@ def main(args):
 
     PomdpWrapper = pomdp_wrappers[env_name]
     env = PomdpWrapper(OneHotAction(GymMinAtar(env_name)))
+
+    """cartpole-v1 added start"""
+    cart_pole_v1 = MyCartPoleWrapper()
+    env = OneHotAction(cart_pole_v1)
+    """cartpole-v1 added end"""
+
     obs_shape = env.observation_space.shape
     action_size = env.action_space.shape[0]
     obs_dtype = bool
@@ -45,37 +52,56 @@ def main(args):
     batch_size = args.batch_size
     seq_len = args.seq_len
 
-    config = MinAtarConfig(
+    config = CartPoleConfig(
         env=env_name,
         obs_shape=obs_shape,
         action_size=action_size,
-        obs_dtype = obs_dtype,
-        action_dtype = action_dtype,
-        seq_len = seq_len,
-        batch_size = batch_size,
-        model_dir=model_dir, 
+        obs_dtype=obs_dtype,
+        action_dtype=action_dtype,
+        seq_len=seq_len,
+        batch_size=batch_size,
+        model_dir=model_dir,
     )
+
+
+    # config = MinAtarConfig(
+    #     env=env_name,
+    #     obs_shape=obs_shape,
+    #     action_size=action_size,
+    #     obs_dtype = obs_dtype,
+    #     action_dtype = action_dtype,
+    #     seq_len = seq_len,
+    #     batch_size = batch_size,
+    #     model_dir=model_dir,
+    # )
 
     config_dict = config.__dict__
     trainer = Trainer(config, device)
     evaluator = Evaluator(config, device)
     
-    with wandb.init(project='mastering MinAtar with world models', config=config_dict):
+    with wandb.init(entity="aaaa112-1",
+                    project='Cartpole-v1',
+                    config=config_dict):
         """training loop"""
         print('...training...')
         train_metrics = {}
-        trainer.collect_seed_episodes(env)
-        obs, score = env.reset(), 0
+        """????"""
+        # trainer.collect_seed_episodes(env)
+        obs, score = env.reset(seed=args.seed), 0
+
+        """prev_info"""
         done = False
         prev_rssmstate = trainer.RSSM._init_rssm_state(1)
         prev_action = torch.zeros(1, trainer.action_size).to(trainer.device)
+
         episode_actor_ent = []
         scores = []
         best_mean_score = 0
         train_episodes = 0
         best_save_path = os.path.join(model_dir, 'models_best.pth')
-        for iter in range(1, trainer.config.train_steps):  
-            if iter%trainer.config.train_every == 0:
+        for iter in range(1, trainer.config.train_steps):
+            """start_training added"""
+            if iter > config.start_training and iter%trainer.config.train_every == 0:
                 train_metrics = trainer.train_batch(train_metrics)
             if iter%trainer.config.slow_target_update == 0:
                 trainer.update_target()                
@@ -99,6 +125,7 @@ def main(args):
                 train_metrics['train_rewards'] = score
                 train_metrics['action_ent'] =  np.mean(episode_actor_ent)
                 train_metrics['train_steps'] = iter
+                """x-axis is train_episodes"""
                 wandb.log(train_metrics, step=train_episodes)
                 scores.append(score)
                 if len(scores)>100:
@@ -110,14 +137,18 @@ def main(args):
                         save_dict = trainer.get_save_dict()
                         torch.save(save_dict, best_save_path)
                 
-                obs, score = env.reset(), 0
+                obs, score = env.reset(seed=args.seed), 0
+
+                """reset prev_info"""
                 done = False
                 prev_rssmstate = trainer.RSSM._init_rssm_state(1)
                 prev_action = torch.zeros(1, trainer.action_size).to(trainer.device)
+
                 episode_actor_ent = []
             else:
                 trainer.buffer.add(obs, action.squeeze(0).detach().cpu().numpy(), rew, done)
                 obs = next_obs
+                """reset prev_info"""
                 prev_rssmstate = posterior_rssm_state
                 prev_action = action
 
@@ -128,9 +159,10 @@ if __name__ == "__main__":
 
     """there are tonnes of HPs, if you want to do an ablation over any particular one, please add if here"""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--env", type=str, help='mini atari env name')
+    """保存模型时先修改这个环境名"""
+    parser.add_argument("--env", type=str, default="CartPole-v1", help='mini atari env name')
     parser.add_argument("--id", type=str, default='0', help='Experiment ID')
-    parser.add_argument('--seed', type=int, default=123, help='Random seed')
+    parser.add_argument('--seed', type=int, default=1, help='Random seed')
     parser.add_argument('--device', default='cuda', help='CUDA or CPU')
     parser.add_argument('--batch_size', type=int, default=50, help='Batch size')
     parser.add_argument('--seq_len', type=int, default=50, help='Sequence Length (chunk length)')
