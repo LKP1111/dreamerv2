@@ -11,7 +11,7 @@ class ObsEncoder(nn.Module):
         :param embedding_size: Supposed length of encoded vector
         """
         super(ObsEncoder, self).__init__()
-        self.shape = input_shape
+        self.shape = input_shape  # (3, 10, 10)
         activation = info['activation']
         d = info['depth']
         k  = info['kernel']
@@ -44,6 +44,7 @@ class ObsEncoder(nn.Module):
         conv2_shape = conv_out_shape(conv1_shape, 0, self.k, 1)
         conv3_shape = conv_out_shape(conv2_shape, 0, self.k, 1)
         embed_size = int(4*self.d*np.prod(conv3_shape).item())
+        # TODO understanding
         return embed_size
 
 class ObsDecoder(nn.Module):
