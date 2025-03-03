@@ -5,8 +5,8 @@ import torch
 import numpy as np
 """0.18.0 change to 0.26.2; done = terminated or truncated"""
 import gymnasium as gym
-from dreamerv2.utils.wrapper import GymMinAtar, OneHotAction, breakoutPOMDP, space_invadersPOMDP, seaquestPOMDP, asterixPOMDP, freewayPOMDP
-from dreamerv2.training.config import MinAtarConfig, CartPoleConfig
+from dreamerv2.utils.wrapper import MyBreakoutWrapper, GymMinAtar, OneHotAction, breakoutPOMDP, space_invadersPOMDP, seaquestPOMDP, asterixPOMDP, freewayPOMDP, MyCartPoleWrapper
+from dreamerv2.training.config import MinAtarConfig, CartPoleConfig, BreakoutConfig
 from dreamerv2.training.trainer import Trainer
 from dreamerv2.training.evaluator import Evaluator
 
@@ -17,7 +17,6 @@ pomdp_wrappers = {
     'asterix': asterixPOMDP,
     'freeway': freewayPOMDP,
 }
-
 
 def main(args):
     wandb.login()
@@ -38,8 +37,13 @@ def main(args):
         device = torch.device('cpu')
     print('using :', device)
 
-    PomdpWrapper = pomdp_wrappers[env_name]
-    env = PomdpWrapper(OneHotAction(GymMinAtar(env_name)))
+    # PomdpWrapper = pomdp_wrappers[env_name]
+    # env = PomdpWrapper(OneHotAction(GymMinAtar(env_name)))
+
+    """breakout-v5 added start"""
+    breakout_v5 = MyBreakoutWrapper()
+    env = OneHotAction(breakout_v5)
+    """breakout-v5 added end"""
 
     obs_shape = env.observation_space.shape
     action_size = env.action_space.shape[0]
@@ -48,34 +52,34 @@ def main(args):
     batch_size = args.batch_size
     seq_len = args.seq_len
 
-    # config = CartPoleConfig(
-    #     env=env_name,
-    #     obs_shape=obs_shape,
-    #     action_size=action_size,
-    #     obs_dtype=obs_dtype,
-    #     action_dtype=action_dtype,
-    #     seq_len=seq_len,
-    #     batch_size=batch_size,
-    #     model_dir=model_dir,
-    # )
-
-    config = MinAtarConfig(
+    config = BreakoutConfig(
         env=env_name,
         obs_shape=obs_shape,
         action_size=action_size,
-        obs_dtype = obs_dtype,
-        action_dtype = action_dtype,
-        seq_len = seq_len,
-        batch_size = batch_size,
+        obs_dtype=obs_dtype,
+        action_dtype=action_dtype,
+        seq_len=seq_len,
+        batch_size=batch_size,
         model_dir=model_dir,
     )
+
+    # config = MinAtarConfig(
+    #     env=env_name,
+    #     obs_shape=obs_shape,
+    #     action_size=action_size,
+    #     obs_dtype = obs_dtype,
+    #     action_dtype = action_dtype,
+    #     seq_len = seq_len,
+    #     batch_size = batch_size,
+    #     model_dir=model_dir,
+    # )
 
     config_dict = config.__dict__
     trainer = Trainer(config, device)
     evaluator = Evaluator(config, device)
 
     with wandb.init(entity="aaaa112-1",
-                    project='mastering MinAtar with world models',
+                    project='Breakout-v5',
                     config=config_dict):
         """training loop"""
         print('...training...')
@@ -154,7 +158,7 @@ if __name__ == "__main__":
     """there are tonnes of HPs, if you want to do an ablation over any particular one, please add if here"""
     parser = argparse.ArgumentParser()
     """保存模型时先修改这个环境名"""
-    parser.add_argument("--env", type=str, default="breakout", help='mini atari env name')
+    parser.add_argument("--env", type=str, default="Breakout-v5", help='mini atari env name')
     parser.add_argument("--id", type=str, default='0', help='Experiment ID')
     parser.add_argument('--seed', type=int, default=1, help='Random seed')
     parser.add_argument('--device', default='cuda', help='CUDA or CPU')

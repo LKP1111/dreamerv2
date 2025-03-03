@@ -1,6 +1,8 @@
 import minatar
-import gym
+import gymnasium as gym
 import numpy as np
+import cv2
+from collections import deque
 
 class GymMinAtar(gym.Env):
     metadata = {'render.modes': ['human', 'rgb_array']}
@@ -16,6 +18,7 @@ class GymMinAtar(gym.Env):
 
     def reset(self):
         self.env.reset()
+        """(c, h, w) (3, 10, 10) 这里 minatar 不是 grayscale"""
         return self.env.state().transpose(2, 0, 1)
     
     def step(self, index):
@@ -60,6 +63,151 @@ class MyCartPoleWrapper(gym.Wrapper):
         done = terminated or truncated
         return state, reward, done, info
 
+
+class MyBreakoutWrapper(gym.Wrapper):
+    """
+    We modify the Atari environment to accelerate the training with some tricks:
+        Episode termination: Make end-of-life == end-of-episode, but only reset on true game over. Done by DeepMind for the DQN and co. since it helps value estimation.
+        Frame skipping: Return only every `skip`-th frame.
+        Observation resize: Warp frames from 210x160 to 84x84 as done in the Nature paper and later work.
+        Frame Stacking: Stack k last frames. Returns lazy array, which is much more memory efficient.
+    """
+
+    def __init__(self):
+        self.env = gym.make("ALE/Breakout-v5",
+                            render_mode="rgb_array",
+                            obs_type="grayscale",
+                            frameskip=4,
+                            full_action_space=False)
+        self.env.action_space.seed(seed=1)
+        self.env.unwrapped.reset(seed=1)
+        self.max_episode_steps = self.env._max_episode_steps if hasattr(self.env, '_max_episode_steps') else 1e5
+        super(MyBreakoutWrapper, self).__init__(self.env)
+        # self.env.seed(config.env_seed)
+        self.num_stack = 1
+        self.obs_type = "grayscale"
+        self.frames = deque([], maxlen=1)
+        # self.image_size = [210, 160] if config.img_size is None else config.img_size
+        self.image_size = [64, 64]
+        self.noop_max = 30
+        self.lifes = self.env.unwrapped.ale.lives()
+        self.was_real_done = True
+        self.grayscale, self.rgb = False, False
+        if self.obs_type == "rgb":
+            self.rgb = True
+            self.observation_space = gym.spaces.Box(
+                low=0, high=255, shape=(self.image_size[0], self.image_size[1], 3 * self.num_stack), dtype=np.uint8)
+        elif self.obs_type == "grayscale":
+            self.grayscale = True
+            # self.observation_space = gym.spaces.Box(
+            #     low=0, high=255, shape=(self.image_size[0], self.image_size[1], self.num_stack), dtype=np.uint8)
+            self.observation_space = gym.spaces.Box(
+                low=0, high=255, shape=(self.num_stack, self.image_size[0], self.image_size[1]), dtype=np.uint8)
+        else:  # ram type
+            self.observation_space = self.env.observation_space
+        # assert self.env.unwrapped.get_action_meanings()[0] == "NOOP"
+        # assert self.env.unwrapped.get_action_meanings()[1] == "FIRE"
+        # assert len(self.env.unwrapped.get_action_meanings()) >= 3
+        self.action_space = self.env.action_space
+        self.metadata = self.env.metadata
+        self.reward_range = self.env.reward_range
+        self._render_mode = self.render_mode
+        self._episode_step = 0
+
+    def close(self):
+        self.env.close()
+
+    def render(self, *args, **kwargs):
+        return self.env.render()
+
+    def reset(self, seed):
+        info = {}
+        if self.was_real_done:
+            self.env.reset()
+            # Execute NoOp actions
+            num_noops = np.random.randint(0, self.noop_max)
+            for _ in range(num_noops):
+                obs, _, done, _, _ = self.env.step(0)
+                if done:
+                    self.env.reset(seed=seed)
+            # try to fire
+            obs, _, done, _, _ = self.env.step(1)
+            if done:
+                obs = self.env.reset()
+            # stack reset observations
+            for _ in range(self.num_stack):
+                self.frames.append(self.observation(obs))
+
+            self._episode_step = 0
+        else:
+            obs, _, done, _, _ = self.env.step(0)
+            for _ in range(self.num_stack):
+                self.frames.append(self.observation(obs))
+
+        self.lifes = self.env.ale.lives()
+        self.was_real_done = False
+        return self._get_obs()
+
+    def step(self, actions):
+        observation, reward, terminated, truncated, info = self.env.step(actions)
+        self.frames.append(self.observation(observation))
+        lives = self.env.ale.lives()
+        # avoid environment bug
+        if self.max_episode_steps is not None:
+            if self._episode_step >= self.max_episode_steps:
+                terminated = True
+        self.was_real_done = terminated
+        if (lives < self.lifes) and (lives > 0):
+            terminated = True
+        truncated = self.was_real_done
+        self.lifes = lives
+        self._episode_step += 1
+        return self._get_obs(), self.reward(reward), terminated or truncated, info
+
+    def _get_obs(self):
+        assert len(self.frames) == self.num_stack
+        return LazyFrames(list(self.frames))[:]
+
+    def observation(self, frame):
+        if self.grayscale:
+            return np.expand_dims(cv2.resize(frame, self.image_size, interpolation=cv2.INTER_AREA), -1).transpose(2, 0, 1)
+        elif self.rgb:
+            return cv2.resize(frame, self.image_size, interpolation=cv2.INTER_AREA)
+        else:
+            return frame
+
+    def reward(self, reward):
+        return np.sign(reward)
+
+
+class LazyFrames(object):
+    """
+    This object ensures that common frames between the observations are only stored once.
+    It exists purely to optimize memory usage which can be huge for DQN's 1M frames replay buffers.
+    This object should only be converted to numpy array before being passed to the model.
+    """
+
+    def __init__(self, frames):
+        self._frames = frames
+        self._out = None
+
+    def _force(self):
+        if self._out is None:
+            self._out = np.concatenate(self._frames, axis=-1)
+            self._frames = None
+        return self._out
+
+    def __array__(self, dtype=None):
+        out = self._force()
+        if dtype is not None:
+            out = out.astype(dtype)
+        return out
+
+    def __len__(self):
+        return len(self._force())
+
+    def __getitem__(self, i):
+        return self._force()[..., i]
 
 
 """下面只是针对特定 minatar 环境的 obs_wrapper, 对观测进行处理, 让环境变成 POMDP"""

@@ -4,7 +4,7 @@ import os
 import torch
 import numpy as np
 """0.18.0 change to 0.26.2; done = terminated or truncated"""
-import gym
+import gymnasium as gym
 from dreamerv2.utils.wrapper import GymMinAtar, OneHotAction, breakoutPOMDP, space_invadersPOMDP, seaquestPOMDP, asterixPOMDP, freewayPOMDP, MyCartPoleWrapper
 from dreamerv2.training.config import MinAtarConfig, CartPoleConfig
 from dreamerv2.training.trainer import Trainer
