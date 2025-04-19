@@ -1,3 +1,3 @@
-from .trainer import Trainer
+from .trainer_v2 import Trainer
 from .config import MinAtarConfig
-from .evaluator import Evaluator
+from .evaluator_v2 import Evaluator

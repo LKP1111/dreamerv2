@@ -1,4 +1,4 @@
-name: dreamer
+name: v2_test
 channels:
   - pytorch
   - nvidia

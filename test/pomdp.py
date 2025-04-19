@@ -6,8 +6,8 @@ import numpy as np
 import gym
 from dreamerv2.utils.wrapper import GymMinAtar, OneHotAction, breakoutPOMDP, space_invadersPOMDP, seaquestPOMDP, asterixPOMDP, freewayPOMDP
 from dreamerv2.training.config import MinAtarConfig
-from dreamerv2.training.trainer import Trainer
-from dreamerv2.training.evaluator import Evaluator
+from dreamerv2.training.trainer_v2 import Trainer
+from dreamerv2.training.evaluator_v2 import Evaluator
 
 pomdp_wrappers = {
     'breakout':breakoutPOMDP,
@@ -59,8 +59,10 @@ def main(args):
     config_dict = config.__dict__
     trainer = Trainer(config, device)
     evaluator = Evaluator(config, device)
-    
-    with wandb.init(project='mastering MinAtar with world models', config=config_dict):
+
+    with wandb.init(entity="aaaa112-1",
+                    project='test',
+                    config=config_dict):
         """training loop"""
         print('...training...')
         train_metrics = {}

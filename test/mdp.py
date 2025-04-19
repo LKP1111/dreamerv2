@@ -6,8 +6,8 @@ import numpy as np
 import gym
 from dreamerv2.utils.wrapper import GymMinAtar, OneHotAction
 from dreamerv2.training.config import MinAtarConfig
-from dreamerv2.training.trainer import Trainer
-from dreamerv2.training.evaluator import Evaluator
+from dreamerv2.training.trainer_v2 import Trainer
+from dreamerv2.training.evaluator_v2 import Evaluator
 
 def main(args):
     wandb.login()

@@ -2,6 +2,24 @@ import minatar
 import gym
 import numpy as np
 
+class RoboDeskImageWrapper(gym.Wrapper):
+    def __init__(self, env):
+        super(RoboDeskImageWrapper, self).__init__(env)
+        assert hasattr(env, "image_size")
+        self.observation_space = gym.spaces.Box(0, 1, shape=(3, env.image_size, env.image_size), dtype=np.uint8)
+
+    def reset(self, **kwargs):
+        obs = self.env.reset(**kwargs)
+        return self.observation(obs)
+
+    def step(self, action):
+        """Returns a modified observation using :meth:`self.observation` after calling :meth:`env.step`."""
+        observation, reward, terminated, info = self.env.step(action)
+        return self.observation(observation), reward, terminated, info
+
+    def observation(self, observation):
+        return observation["image"].transpose(2, 0, 1)
+
 class GymMinAtar(gym.Env):
     metadata = {'render.modes': ['human', 'rgb_array']}
 
